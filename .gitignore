@@ -1,0 +1,6 @@
+# Local tooling config (dev-only)
+.claude/
+
+# Source material — contains the restaurant's contact details,
+# not part of the app and must never be published
+menu_emporter_2024.pdf

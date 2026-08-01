@@ -1,0 +1,16 @@
+{
+  "name": "Kitchen Timer",
+  "short_name": "Kitchen Timer",
+  "description": "Kitchen multi-timer for the frying and steaming stations.",
+  "lang": "en",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#141619",
+  "theme_color": "#141619",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<!-- Unlisted deployment: keep search engines from indexing the app -->
+<meta name="robots" content="noindex, nofollow">
+<title>Kitchen Timer</title>
+<meta name="theme-color" content="#141619">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ============================================================
+     MAIN SCREEN: timer list (top) + action bar (bottom)
+     All user-facing text is translated at runtime via data-i18n
+     attributes (see lang/*.js and applyTranslations()).
+     ============================================================ -->
+<main id="main-screen">
+  <!-- Industrial top bar: restaurant name + clock -->
+  <header id="topbar">
+    <span id="topbar-name">RESTAURANT</span>
+    <span id="topbar-title" data-i18n="topbar.title">Kitchen timer</span>
+    <span id="topbar-clock">--:--</span>
+  </header>
+  <section id="timer-list" aria-live="polite"></section>
+  <p id="empty-message" data-i18n-html="main.empty">No timers running.</p>
+  <footer id="action-bar">
+    <button id="btn-add" type="button" data-i18n="main.add">＋ Add</button>
+    <button id="btn-settings" type="button" aria-label="Settings">⚙️</button>
+  </footer>
+</main>
+
+<!-- ============================================================
+     ADD OVERLAY: fullscreen, big buttons
+     ============================================================ -->
+<div id="add-overlay" class="overlay" hidden>
+  <button id="btn-close-add" class="btn-cancel-overlay" type="button" data-i18n="add.cancel">✕ Cancel</button>
+
+  <!-- Optional table number, picked BEFORE starting the timer:
+       empty field by default, tapping it opens the numpad -->
+  <div id="table-block">
+    <span class="table-label" data-i18n="common.table">Table</span>
+    <button id="table-field" type="button">—</button>
+  </div>
+
+  <!-- Tabs shown only in "both" mode -->
+  <div id="add-tabs" hidden>
+    <button id="tab-foods" class="tab active" type="button" data-i18n="add.tabFoods">🍜 Foods</button>
+    <button id="tab-durations" class="tab" type="button" data-i18n="add.tabDurations">⏱ Durations</button>
+  </div>
+
+  <!-- Foods mode: grid of big buttons (1 tap = start) -->
+  <div id="foods-panel" class="panel"></div>
+
+  <!-- Durations mode: presets + free duration steppers -->
+  <div id="durations-panel" class="panel" hidden>
+    <div id="durations-grid"></div>
+    <div id="custom-block">
+      <div id="custom-display">05:00</div>
+      <div id="custom-steppers">
+        <button type="button" data-delta="60" data-i18n="add.plus1m">＋1 min</button>
+        <button type="button" data-delta="-60" data-i18n="add.minus1m">−1 min</button>
+        <button type="button" data-delta="10" data-i18n="add.plus10s">＋10 s</button>
+        <button type="button" data-delta="-10" data-i18n="add.minus10s">−10 s</button>
+      </div>
+      <button id="btn-start-custom" type="button" data-i18n="add.start">▶ Start</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     SETTINGS OVERLAY
+     ============================================================ -->
+<div id="settings-overlay" class="overlay" hidden>
+  <header class="settings-header">
+    <h1 data-i18n="settings.title">Settings</h1>
+    <button id="btn-close-settings" type="button" data-i18n="settings.close">✕ Close</button>
+  </header>
+
+  <div id="settings-content">
+
+    <section class="section">
+      <h2 data-i18n="settings.sortTitle">Timer sorting</h2>
+      <div class="choice-row" id="sort-choice">
+        <button type="button" data-val="asc" data-i18n-html="settings.sortAsc">⬆ Ascending</button>
+        <button type="button" data-val="desc" data-i18n-html="settings.sortDesc">⬇ Descending</button>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2 data-i18n="settings.modeTitle">Add menu</h2>
+      <div class="choice-row" id="mode-choice">
+        <button type="button" data-val="foods" data-i18n="settings.modeFoods">Foods</button>
+        <button type="button" data-val="durations" data-i18n="settings.modeDurations">Durations</button>
+        <button type="button" data-val="both" data-i18n="settings.modeBoth">Both</button>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2 data-i18n="settings.durationsTitle">Duration presets</h2>
+      <div id="duration-presets-list"></div>
+      <div class="add-duration-row">
+        <input id="new-duration-input" type="number" min="1" max="180" step="1" value="20">
+        <span data-i18n="food.unitMin">min</span>
+        <button id="btn-add-duration" type="button" data-i18n="settings.addDuration">＋ Add</button>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2 data-i18n="settings.foodsTitle">Foods</h2>
+      <div id="foods-list"></div>
+      <button id="btn-add-food" type="button" class="btn-large" data-i18n="settings.addFood">＋ Add a food</button>
+    </section>
+
+    <section class="section">
+      <h2 data-i18n="settings.iconsTitle">Icons</h2>
+      <div id="icons-grid"></div>
+      <div class="choice-row">
+        <button id="btn-import-images" type="button" data-i18n="settings.importImages">🖼 Import images</button>
+        <button id="btn-import-pack" type="button" data-i18n="settings.importPack">📦 Import a pack</button>
+      </div>
+      <button id="btn-ai-prompt" type="button" class="btn-large" data-i18n="settings.aiPrompt">✨ Generate an icon pack with AI</button>
+      <input id="images-file-input" type="file" accept="image/*" multiple hidden>
+      <input id="pack-file-input" type="file" accept="application/json,.json" hidden>
+      <p id="icons-message" class="io-message"></p>
+    </section>
+
+    <section class="section">
+      <h2 data-i18n="settings.tablesTitle">Table numbers</h2>
+      <div class="stepper-row">
+        <button id="btn-table-minus" type="button">−</button>
+        <span id="table-max-display">1 – 20</span>
+        <button id="btn-table-plus" type="button">＋</button>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2 data-i18n="settings.alarmTitle">Alarm</h2>
+      <input id="volume-slider" type="range" min="0" max="1" step="0.05">
+      <button id="btn-test-alarm" type="button" class="btn-large" data-i18n="settings.testAlarm">🔔 Test the alarm</button>
+    </section>
+
+    <section class="section">
+      <h2 data-i18n="settings.restaurantTitle">Restaurant</h2>
+      <input id="restaurant-input" type="text" data-i18n-placeholder="settings.restaurantPlaceholder">
+    </section>
+
+    <section class="section">
+      <h2 data-i18n="settings.languageTitle">Language</h2>
+      <!-- Language names stay in their own language on purpose -->
+      <div class="choice-row" id="language-choice">
+        <button type="button" data-val="en">English</button>
+        <button type="button" data-val="fr">Français</button>
+        <button type="button" data-val="zh-TW">繁體中文</button>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2 data-i18n="settings.ioTitle">Import / Export</h2>
+      <div class="choice-row">
+        <button id="btn-export" type="button" data-i18n="settings.export">⬇ Export</button>
+        <button id="btn-import" type="button" data-i18n="settings.import">⬆ Import</button>
+      </div>
+      <input id="config-file-input" type="file" accept="application/json,.json" hidden>
+      <p id="import-message" class="io-message"></p>
+    </section>
+
+  </div>
+</div>
+
+<!-- ============================================================
+     IMPORT CHOICE OVERLAY: Replace all / Merge
+     ============================================================ -->
+<div id="import-overlay" class="overlay overlay-center" hidden>
+  <div class="dialog-box">
+    <p id="import-summary"></p>
+    <button id="btn-import-replace" type="button" class="btn-large" data-i18n="import.replace">Replace all</button>
+    <button id="btn-import-merge" type="button" class="btn-large" data-i18n="import.merge">Merge</button>
+    <button id="btn-import-cancel" type="button" class="btn-large secondary" data-i18n="import.cancel">Cancel</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     DELETE CONFIRMATION: floating menu
+     (opened by tapping the ✕ on a timer row)
+     ============================================================ -->
+<div id="delete-overlay" class="overlay overlay-center" hidden>
+  <div class="dialog-box delete-box">
+    <h2 data-i18n="delete.title">Delete this timer?</h2>
+    <p id="delete-label"></p>
+    <button id="btn-delete-confirm" type="button" class="btn-large" data-i18n="delete.confirm">🗑 Delete</button>
+    <button id="btn-delete-cancel" type="button" class="btn-large secondary" data-i18n="delete.cancel">Cancel</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     TIME ADJUST OVERLAY: add / remove time on a timer
+     (opened by tapping a row's countdown, even while ringing)
+     ============================================================ -->
+<div id="adjust-overlay" class="overlay overlay-center" hidden>
+  <div class="dialog-box adjust-box">
+    <h2 data-i18n="adjust.title">Adjust time</h2>
+    <p id="adjust-label"></p>
+    <div id="adjust-display">00:00</div>
+    <div id="adjust-delta">±0</div>
+    <div id="adjust-grid">
+      <button type="button" data-delta="60" data-i18n="adjust.plus1">＋1 min</button>
+      <button type="button" data-delta="300" data-i18n="adjust.plus5">＋5 min</button>
+      <button type="button" data-delta="-60" data-i18n="adjust.minus1">−1 min</button>
+      <button type="button" data-delta="-300" data-i18n="adjust.minus5">−5 min</button>
+    </div>
+    <button id="btn-adjust-confirm" type="button" class="btn-large" data-i18n="adjust.confirm">✔ Confirm</button>
+    <button id="btn-adjust-cancel" type="button" class="btn-large secondary" data-i18n="adjust.cancel">Cancel</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     NUMPAD OVERLAY: table number entry
+     ============================================================ -->
+<div id="numpad-overlay" class="overlay overlay-center" hidden>
+  <div class="dialog-box numpad-box">
+    <h2 data-i18n="numpad.title">Table number</h2>
+    <div id="numpad-display">—</div>
+    <div id="numpad-grid">
+      <button type="button" data-digit="1">1</button>
+      <button type="button" data-digit="2">2</button>
+      <button type="button" data-digit="3">3</button>
+      <button type="button" data-digit="4">4</button>
+      <button type="button" data-digit="5">5</button>
+      <button type="button" data-digit="6">6</button>
+      <button type="button" data-digit="7">7</button>
+      <button type="button" data-digit="8">8</button>
+      <button type="button" data-digit="9">9</button>
+      <button type="button" id="btn-numpad-erase">⌫</button>
+      <button type="button" data-digit="0">0</button>
+      <button type="button" id="btn-numpad-ok">OK</button>
+    </div>
+    <button id="btn-numpad-cancel" type="button" class="btn-large secondary" data-i18n="numpad.cancel">Cancel</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     ICON / COLOR PICKER OVERLAYS (food editor)
+     ============================================================ -->
+<div id="icon-picker-overlay" class="overlay overlay-center" hidden>
+  <div class="dialog-box">
+    <h2 data-i18n="iconPicker.title">Choose an icon</h2>
+    <h3 id="custom-icons-title" class="subtitle" data-i18n="iconPicker.mine" hidden>My icons</h3>
+    <div id="custom-icons-grid"></div>
+    <h3 class="subtitle" data-i18n="iconPicker.emojis">Emojis</h3>
+    <div id="emoji-grid"></div>
+    <button id="btn-icon-picker-cancel" type="button" class="btn-large secondary" data-i18n="iconPicker.cancel">Cancel</button>
+  </div>
+</div>
+<div id="color-overlay" class="overlay overlay-center" hidden>
+  <div class="dialog-box">
+    <h2 data-i18n="colorPicker.title">Choose a color</h2>
+    <div id="color-grid"></div>
+    <button id="btn-color-cancel" type="button" class="btn-large secondary" data-i18n="colorPicker.cancel">Cancel</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     AI PROMPT OVERLAY: copyable snippet to generate an icon pack
+     ============================================================ -->
+<div id="prompt-overlay" class="overlay overlay-center" hidden>
+  <div class="dialog-box prompt-box">
+    <h2 data-i18n="prompt.title">Prompt to copy into your AI</h2>
+    <p class="prompt-help" data-i18n="prompt.help"></p>
+    <textarea id="prompt-text" spellcheck="false"></textarea>
+    <button id="btn-copy-prompt" type="button" class="btn-large" data-i18n="prompt.copy">📋 Copy the prompt</button>
+    <button id="btn-close-prompt" type="button" class="btn-large secondary" data-i18n="prompt.close">Close</button>
+  </div>
+</div>
+
+<script src="default-config.js"></script>
+<script src="lang/en.js"></script>
+<script src="lang/fr.js"></script>
+<script src="lang/zh-TW.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
